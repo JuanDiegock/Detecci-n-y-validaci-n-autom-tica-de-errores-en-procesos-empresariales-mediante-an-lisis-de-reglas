@@ -1,0 +1,144 @@
+
+:root {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #182230;
+    background: #f3f6fb;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+
+.barra {
+    background: #111b2e;
+    color: white;
+    padding: 16px 7%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.marca { display: flex; align-items: center; gap: 12px; }
+.logo {
+    background: #4f7cff;
+    border-radius: 10px;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    font-size: 23px;
+    font-weight: bold;
+}
+.marca h1, .marca p { margin: 0; }
+.marca h1 { font-size: 21px; }
+.marca p { color: #bdc9dd; font-size: 12px; margin-top: 4px; }
+
+.estado, .insignia {
+    border-radius: 20px;
+    padding: 7px 12px;
+    background: #e3eaff;
+    color: #244bb0;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.contenedor { width: min(1000px, 92%); margin: 32px auto; }
+.introduccion { margin-bottom: 24px; }
+.etiqueta { color: #4169e1; font-size: 11px; font-weight: bold; letter-spacing: 1.4px; }
+.introduccion h2 { font-size: clamp(25px, 4vw, 34px); margin: 9px 0; }
+.introduccion > p:last-child, .titulo-panel p, .descripcion {
+    color: #667085;
+    line-height: 1.6;
+    font-size: 13px;
+}
+
+.panel, .resultados, .automata-card {
+    background: white;
+    padding: 23px;
+    border: 1px solid #e1e7f0;
+    border-radius: 14px;
+    margin-bottom: 22px;
+    box-shadow: 0 6px 20px #1a2a4408;
+}
+
+.titulo-panel { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.titulo-panel h3, .automata-card h3 { margin: 0 0 6px; }
+.titulo-panel p { margin: 0 0 16px; }
+
+textarea {
+    display: block;
+    width: 100%;
+    min-height: 150px;
+    resize: vertical;
+    border: 1px solid #ccd5e3;
+    border-radius: 9px;
+    padding: 14px;
+    font: 14px/1.7 Consolas, monospace;
+    background: #fbfcff;
+    color: #24334d;
+}
+textarea:focus { outline: 2px solid #9db5ff; border-color: #5279ef; }
+
+.acciones { display: flex; align-items: center; gap: 10px; margin-top: 13px; flex-wrap: wrap; }
+button, .boton { padding: 10px 15px; border-radius: 7px; font-weight: 600; cursor: pointer; border: 0; font-size: 12px; }
+.principal { background: #315fe8; color: white; }
+.principal:hover { background: #244ac0; }
+button:disabled { opacity: .6; cursor: wait; }
+.secundario { background: #edf1f8; color: #344054; }
+#archivo { display: none; }
+#mensaje { font-size: 12px; color: #667085; }
+
+.resumen { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0 25px; }
+.tarjeta { background: #f5f7fb; padding: 16px; border-radius: 10px; display: flex; flex-direction: column; gap: 8px; }
+.tarjeta span { font-size: 12px; color: #667085; }
+.tarjeta strong { font-size: 25px; }
+
+h4 { margin-top: 27px; margin-bottom: 12px; font-size: 14px; }
+.tabla-contenedor { overflow-x: auto; margin-bottom: 15px; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; }
+th, td { text-align: left; padding: 11px; border-bottom: 1px solid #e8edf4; overflow-wrap: anywhere; vertical-align: top; }
+th { background: #f3f6fb; color: #344054; }
+
+.codigo-salida {
+    overflow: auto;
+    max-height: 350px;
+    background: #111b2e;
+    color: #e4ecff;
+    border-radius: 9px;
+    padding: 14px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font: 12px/1.6 Consolas, monospace;
+}
+
+.automata-card { background: white; border-color: #dce4f2; margin-top: 18px; }
+.automata-card h3 { color: #244bb0; font-size: 17px; }
+.automata-card p { color: #667085; font-size: 12px; }
+.automata-card .tabla-contenedor { width: 100%; overflow-x: auto; }
+.automata-card table { min-width: 440px; }
+.automata-card th, .automata-card td { padding: 10px 12px; white-space: nowrap; }
+
+.grafico-contenedor {
+    width: 100%;
+    overflow: auto;
+    min-height: 220px;
+    background: #fbfcff;
+    border: 1px solid #dce4f2;
+    border-radius: 10px;
+    padding: 12px;
+}
+.grafico-contenedor svg { display: block; min-width: 500px; height: auto; }
+
+.errores { border-radius: 9px; background: #f6f8fc; padding: 14px; color: #596579; font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.error { color: #b42318; background: #fff0ee; border-radius: 7px; padding: 10px; margin-bottom: 8px; }
+.exito { color: #067647; background: #eaf8f0; padding: 12px; border-radius: 8px; }
+
+footer { text-align: center; color: #788397; font-size: 12px; padding: 25px; }
+
+@media (max-width: 600px) {
+    .barra { padding: 14px 4%; }
+    .estado { display: none; }
+    .panel, .resultados, .automata-card { padding: 15px; }
+    .resumen { grid-template-columns: 1fr; }
+    .titulo-panel { align-items: flex-start; flex-wrap: wrap; }
+}

@@ -1,0 +1,98 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RuleCheck | Validador empresarial</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+<header class="barra">
+    <div class="marca">
+        <span class="logo">R</span>
+        <div>
+            <h1>RuleCheck</h1>
+            <p>Validador de reglas empresariales</p>
+        </div>
+    </div>
+    <span class="estado">ANÁLISIS DE REGLAS</span>
+</header>
+
+<main class="contenedor">
+    <section class="introduccion">
+        <p class="etiqueta">VALIDACIÓN AUTOMÁTICA</p>
+        <h2>Detección de errores en procesos empresariales</h2>
+        <p>Identifica tokens y lexemas, valida reglas y visualiza los autómatas.</p>
+    </section>
+
+    <section class="panel">
+        <div class="titulo-panel">
+            <div>
+                <h3>Editor de reglas empresariales</h3>
+                <p>Escribe una regla por línea o carga un archivo de texto.</p>
+            </div>
+            <button id="ejemplo" class="secundario" type="button">Cargar ejemplo</button>
+        </div>
+
+        <textarea id="codigo" spellcheck="false"
+            placeholder="REGLA validar_compra SI monto > 0 ENTONCES APROBAR"></textarea>
+
+        <div class="acciones">
+            <label class="boton secundario" for="archivo">Subir archivo</label>
+            <input type="file" id="archivo" accept=".txt,.rule,.code">
+            <button id="analizar" class="principal" type="button">Analizar reglas</button>
+        </div>
+        <p id="mensaje" role="status">Listo para analizar.</p>
+    </section>
+
+    <section class="resultados">
+        <div class="titulo-panel">
+            <div>
+                <h3>Resultado del análisis</h3>
+                <p>Resultados de las expresiones regulares y los autómatas.</p>
+            </div>
+            <span id="estadoResultado" class="insignia">Sin analizar</span>
+        </div>
+
+        <div class="resumen">
+            <div class="tarjeta"><span>Tokens identificados</span><strong id="totalTokens">0</strong></div>
+            <div class="tarjeta"><span>Errores detectados</span><strong id="totalErrores">0</strong></div>
+        </div>
+
+        <h4>1. Tokens y lexemas</h4>
+        <div class="tabla-contenedor">
+            <table>
+                <thead><tr><th>Tipo</th><th>Lexema</th><th>Posición</th></tr></thead>
+                <tbody id="tablaTokens"><tr><td colspan="3">Sin resultados.</td></tr></tbody>
+            </table>
+        </div>
+
+        <h4>2. Expresiones regulares (ER)</h4>
+        <div class="tabla-contenedor">
+            <table>
+                <thead><tr><th>Tipo de lexema</th><th>Expresión regular</th></tr></thead>
+                <tbody id="tablaER"><tr><td colspan="2">Sin resultados.</td></tr></tbody>
+            </table>
+        </div>
+
+        <h4>3. Validación de reglas</h4>
+        <div class="tabla-contenedor">
+            <table>
+                <thead><tr><th>Línea</th><th>Regla</th><th>Resultado</th></tr></thead>
+                <tbody id="tablaReglas"><tr><td colspan="3">Sin resultados.</td></tr></tbody>
+            </table>
+        </div>
+
+        <h4>4–9. AFND, AFD, tablas, gráficos y quíntuplas</h4>
+        <div id="contenedorAutomatas" class="automatas">Ejecuta el análisis para generar los autómatas.</div>
+
+        <h4>Errores detectados</h4>
+        <div id="listaErrores" class="errores">Sin resultados.</div>
+    </section>
+</main>
+
+<footer>RuleCheck · Análisis de reglas empresariales</footer>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
