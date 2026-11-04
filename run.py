@@ -1,270 +1,226 @@
-
 from pathlib import Path
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 import re
 
+from app.automata import generar_automatas, generar_expresiones_regulares
+
 BASE_DIR = Path(__file__).resolve().parent
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
+# Los 13 campos que debe contener cada registro.
+CAMPOS = [
+    "Nombre",
+    "Apellido",
+    "DNI",
+    "Edad",
+    "Diagnostico",
+    "Fecha",
+    "Hora",
+    "Hospital/Clinica",
+    "Laboratorio",
+    "Salon",
+    "Examenes",
+    "Enfermera/Medico",
+    "Tipo de sangre",
+]
 
-def buscar_archivo(nombre):
-    """Busca un archivo dentro del proyecto, incluidas sus subcarpetas."""
-    encontrados = []
+EJEMPLO = """Nombre: Juan
+Apellido: Perez
+DNI: 12345678
+Edad: 30
+Diagnostico: J00
+Fecha: 2025-06-10
+Hora: 09:15
+Hospital/Clinica: Clinica Central
+Laboratorio: Lab Uno
+Salon: MI-P2-103
+Examenes: Hemograma
+Enfermera/Medico: Dra Lopez
+Tipo de sangre: A+"""
 
-    for ruta in BASE_DIR.rglob(nombre):
-        if any(
-            parte in {".venv", "venv", "__pycache__", ".git"}
-            for parte in ruta.parts
-        ):
-            continue
-
-        encontrados.append(ruta)
-
-    return encontrados
-
-
-# Buscar los archivos reales
-htmls = buscar_archivo("index.html")
-csss = buscar_archivo("styles.css")
-jss = buscar_archivo("app.js")
-
-print("\n========== DIAGNÓSTICO RULECHECK ==========")
-print("Run.py:", BASE_DIR)
-print("HTML encontrados:", htmls)
-print("CSS encontrados:", csss)
-print("JS encontrados:", jss)
-print("===========================================\n")
-
-if not htmls:
-    raise FileNotFoundError(
-        "No existe ningún index.html dentro del proyecto. "
-        "Comprueba que el archivo esté guardado en VS Code."
-    )
-
-# Usa la carpeta real donde se encontró index.html
-TEMPLATE_DIR = htmls[0].parent
-
-# Prioriza la carpeta que contiene los dos archivos estáticos
-STATIC_DIR = BASE_DIR / "app" / "static"
-
-if not (STATIC_DIR / "styles.css").is_file() or not (
-    STATIC_DIR / "app.js"
-).is_file():
-    if csss and jss and csss[0].parent == jss[0].parent:
-        STATIC_DIR = csss[0].parent
-    elif csss:
-        STATIC_DIR = csss[0].parent
-    elif jss:
-        STATIC_DIR = jss[0].parent
-
-app = Flask(
-    __name__,
-    template_folder=str(TEMPLATE_DIR),
-    static_folder=str(STATIC_DIR)
-)
-
-
-# =====================================================
-# TOKENS Y LEXEMAS
-# =====================================================
-
-PATRON_TOKEN = re.compile(
-    r"REGLA|SI|ENTONCES|APROBAR|RECHAZAR|Y|O|NO"
-    r"|[a-zA-Z_][a-zA-Z0-9_]*"
-    r"|\d+(?:\.\d+)?"
-    r"|>=|<=|==|!="
-    r"|[><=+\-*/]"
-    r"|[():;,.]",
-    re.IGNORECASE
-)
-
-RESERVADAS = {
-    "REGLA", "SI", "ENTONCES", "APROBAR",
-    "RECHAZAR", "Y", "O", "NO"
+PATRONES = {
+    "Nombre": r"[A-Za-zÁÉÍÓÚáéíóúÜüÑñ ]{2,60}",
+    "Apellido": r"[A-Za-zÁÉÍÓÚáéíóúÜüÑñ ]{2,60}",
+    "DNI": r"\d{8}",
+    "Edad": r"\d{1,3}",
+    "Diagnostico": r"[A-Z]\d{2}",
+    "Fecha": r"\d{4}-\d{2}-\d{2}",
+    "Hora": r"(?:[01]\d|2[0-3]):[0-5]\d",
+    "Hospital/Clinica": r"[A-Za-zÁÉÍÓÚáéíóúÜüÑñ0-9 .'-]{2,80}",
+    "Laboratorio": r"[A-Za-zÁÉÍÓÚáéíóúÜüÑñ0-9 .'-]{2,60}",
+    "Salon": r"(?:MI|CI|PED|GO)-P\d{1,2}-\d{1,3}",
+    "Examenes": r"[A-Za-zÁÉÍÓÚáéíóúÜüÑñ0-9 .,'-]{2,80}",
+    "Enfermera/Medico": r"[A-Za-zÁÉÍÓÚáéíóúÜüÑñ .'-]{2,60}",
+    "Tipo de sangre": r"(?:A|B|AB|O)[+-]",
 }
 
+DESCRIPCIONES_CAMPOS = {
+    "Nombre": ("Nombre del paciente", "Juan", "id_nombre"),
+    "Apellido": ("Apellido del paciente", "Perez", "id_apellido"),
+    "DNI": ("Documento de identidad de 8 dígitos", "12345678", "id_dni"),
+    "Edad": ("Edad del paciente (1 a 3 dígitos)", "30", "id_edad"),
+    "Diagnostico": ("Código de diagnóstico", "J00", "id_diagnostico"),
+    "Fecha": ("Fecha en formato AAAA-MM-DD", "2025-06-10", "id_fecha"),
+    "Hora": ("Hora en formato HH:MM", "09:15", "id_hora"),
+    "Hospital/Clinica": ("Nombre del hospital o clínica", "Clinica Central", "id_hospital"),
+    "Laboratorio": ("Nombre del laboratorio", "Lab Uno", "id_laboratorio"),
+    "Salon": ("Código de salón", "MI-P2-103", "id_salon"),
+    "Examenes": ("Nombre del examen médico", "Hemograma", "id_examenes"),
+    "Enfermera/Medico": ("Nombre del personal médico", "Dra Lopez", "id_personal"),
+    "Tipo de sangre": ("Grupo sanguíneo ABO y Rh", "A+", "id_tipo_sangre"),
+}
 
-def analizar_tokens(codigo):
+def analizar_lexico(codigo):
     tokens = []
     errores = []
+    campos_por_nombre = {normalizar(c): c for c in CAMPOS}
 
-    for num_linea, linea in enumerate(codigo.splitlines(), 1):
-        posicion = 0
-
-        for coincidencia in PATRON_TOKEN.finditer(linea):
-            ignorado = linea[posicion:coincidencia.start()]
-
-            if ignorado.strip():
-                errores.append({
-                    "posicion": num_linea,
-                    "mensaje": f"Símbolo no reconocido: {ignorado.strip()}"
-                })
-
-            lexema = coincidencia.group()
-
-            if lexema.upper() in RESERVADAS:
-                tipo = "PALABRA_RESERVADA"
-            elif lexema[0].isdigit():
-                tipo = "NUMERO"
-            elif re.fullmatch(r"[><=+\-*/]+|>=|<=|==|!=", lexema):
-                tipo = "OPERADOR"
-            elif lexema in {"(", ")", ":", ";", ",", "."}:
-                tipo = "DELIMITADOR"
-            else:
-                tipo = "IDENTIFICADOR"
-
-            tokens.append({
-                "token": tipo,
-                "lexema": lexema,
-                "posicion": f"{num_linea}:{coincidencia.start() + 1}"
-            })
-
-            posicion = coincidencia.end()
-
-        sobrante = linea[posicion:]
-
-        if sobrante.strip():
+    for numero, linea in enumerate(codigo.splitlines(), 1):
+        if not linea.strip():
+            continue
+        if ":" not in linea:
             errores.append({
-                "posicion": num_linea,
-                "mensaje": f"Símbolo no reconocido: {sobrante.strip()}"
+                "posicion": numero,
+                "mensaje": "Falta el separador ':' entre el campo y su valor."
             })
+            tokens.append({
+                "token": "LINEA_INVALIDA", "lexema": linea.strip(),
+                "posicion": f"{numero}:1",
+                "descripcion": "Línea sin separador campo-valor",
+                "ejemplo": "Nombre: Juan"
+            })
+            continue
+
+        campo_original, valor_original = linea.split(":", 1)
+        campo = campos_por_nombre.get(normalizar(campo_original))
+        valor = valor_original.strip()
+        columna_valor = len(campo_original) + 2
+
+        if campo is None:
+            errores.append({
+                "posicion": numero,
+                "mensaje": f"Campo no reconocido: {campo_original.strip()}."
+            })
+            tipo_campo = "CAMPO_NO_RECONOCIDO"
+            descripcion = "Campo que no pertenece al formato establecido"
+            ejemplo = "Nombre"
+        else:
+            _, _, tipo_campo = DESCRIPCIONES_CAMPOS[campo]
+            descripcion, ejemplo, _ = DESCRIPCIONES_CAMPOS[campo]
+
+        tokens.append({
+            "token": tipo_campo,
+            "lexema": campo_original.strip(),
+            "posicion": f"{numero}:1",
+            "descripcion": descripcion,
+            "ejemplo": campo
+        })
+        tokens.append({
+            "token": "SEPARADOR",
+            "lexema": ":",
+            "posicion": f"{numero}:{len(campo_original) + 1}",
+            "descripcion": "Dos puntos: separa el nombre del campo de su valor",
+            "ejemplo": ":"
+        })
+        tokens.append({
+            "token": "VALOR_" + (campo or "DESCONOCIDO").upper().replace("/", "_").replace(" ", "_"),
+            "lexema": valor,
+            "posicion": f"{numero}:{columna_valor}",
+            "descripcion": f"Valor correspondiente al campo {campo}" if campo else "Valor de un campo desconocido",
+            "ejemplo": ejemplo if campo else "—"
+        })
 
     return tokens, errores
 
 
-# =====================================================
-# EXPRESIÓN REGULAR Y VALIDACIÓN
-# =====================================================
-
-EXPRESIONES = {
-    "PALABRA_RESERVADA": r"REGLA|SI|ENTONCES|Y|O|NO|APROBAR|RECHAZAR",
-    "IDENTIFICADOR": r"[a-zA-Z_][a-zA-Z0-9_]*",
-    "NUMERO": r"[0-9]+(\.[0-9]+)?",
-    "OPERADOR": r">=|<=|==|!=|>|<|=|\+|-|\*|/",
-    "DELIMITADOR": r"[\(\):;,.]"
-}
-
-ER_REGLA = re.compile(
-    r"^\s*REGLA\s+[a-zA-Z_][a-zA-Z0-9_]*"
-    r"\s+SI\s+[a-zA-Z_][a-zA-Z0-9_]*"
-    r"\s*(?:>=|<=|==|!=|>|<)\s*\d+(?:\.\d+)?"
-    r"\s+ENTONCES\s+(?:APROBAR|RECHAZAR)\s*$",
-    re.IGNORECASE
-)
+def normalizar(texto):
+    return texto.strip().casefold()
 
 
-def validar_reglas(codigo):
+def validar_registro(codigo):
     reglas = []
     errores = []
+    encontrados = {}
+    campos_por_nombre = {normalizar(c): c for c in CAMPOS}
 
     for numero, original in enumerate(codigo.splitlines(), 1):
         linea = original.strip()
-
         if not linea:
             continue
 
-        valida = bool(ER_REGLA.fullmatch(linea))
+        if ":" not in linea:
+            reglas.append({
+                "linea": numero,
+                "regla": linea,
+                "coincide": False,
+                "detalle": "Formato esperado: Campo: Valor"
+            })
+            continue
+
+        campo_original, valor = linea.split(":", 1)
+        campo = campos_por_nombre.get(normalizar(campo_original))
+        valor = valor.strip()
+
+        if not campo:
+            mensaje = f"Campo no reconocido: {campo_original.strip()}."
+            errores.append({"posicion": numero, "mensaje": mensaje})
+            reglas.append({
+                "linea": numero, "regla": linea,
+                "coincide": False, "detalle": mensaje
+            })
+            continue
+
+        clave = normalizar(campo)
+        if clave in encontrados:
+            mensaje = f"El campo '{campo}' está duplicado."
+            errores.append({"posicion": numero, "mensaje": mensaje})
+            reglas.append({
+                "linea": numero, "regla": linea,
+                "coincide": False, "detalle": mensaje
+            })
+            continue
+
+        encontrados[clave] = (numero, valor)
+        patron = PATRONES[campo]
+        valido = bool(re.fullmatch(patron, valor))
+
+        if valido and campo == "Fecha":
+            try:
+                datetime.strptime(valor, "%Y-%m-%d")
+            except ValueError:
+                valido = False
+
+        if valido:
+            detalle = "Formato correcto."
+        else:
+            detalle = f"Valor inválido para {campo}. Verifica el formato esperado."
+            errores.append({"posicion": numero, "mensaje": detalle})
 
         reglas.append({
             "linea": numero,
             "regla": linea,
-            "coincide": valida
+            "coincide": valido,
+            "detalle": detalle
         })
 
-        if not valida:
-            errores.append({
-                "posicion": numero,
-                "mensaje": "La regla no cumple la estructura esperada."
+    for campo in CAMPOS:
+        if normalizar(campo) not in encontrados:
+            mensaje = f"Falta el campo obligatorio: {campo}."
+            errores.append({"posicion": "—", "mensaje": mensaje})
+            reglas.append({
+                "linea": "—",
+                "regla": campo,
+                "coincide": False,
+                "detalle": "Campo obligatorio ausente."
             })
 
     return reglas, errores
 
 
-# =====================================================
-# AUTÓMATAS POR CATEGORÍA
-# =====================================================
-
-def generar_automatas():
-    resultados = []
-
-    patrones = {
-        "PALABRA_RESERVADA": [
-            "REGLA", "SI", "ENTONCES", "Y",
-            "O", "NO", "APROBAR", "RECHAZAR"
-        ],
-        "IDENTIFICADOR": ["LETRA", "LETRA_O_DIGITO"],
-        "NUMERO": ["DIGITO", "DIGITO"],
-        "OPERADOR": [">=", "<=", "==", "!=", ">", "<", "=", "+", "-", "*", "/"],
-        "DELIMITADOR": ["(", ")", ":", ";", ",", "."]
-    }
-
-    for tipo, er in EXPRESIONES.items():
-        estados = ["q0"]
-        transiciones = []
-        finales = []
-        contador = 1
-
-        for alternativa in patrones[tipo]:
-            actual = "q0"
-            destino = f"q{contador}"
-            contador += 1
-
-            estados.append(destino)
-            transiciones.append({
-                "origen": actual,
-                "simbolo": alternativa,
-                "destino": destino
-            })
-            finales.append(destino)
-
-        afnd = {
-            "tipo": tipo,
-            "estados": estados,
-            "alfabeto": sorted(set(t["simbolo"] for t in transiciones)),
-            "inicial": "q0",
-            "finales": finales,
-            "transiciones": transiciones
-        }
-
-        afd = {
-            "tipo": tipo,
-            "estados": estados,
-            "alfabeto": afnd["alfabeto"],
-            "inicial": "q0",
-            "finales": finales,
-            "transiciones": transiciones
-        }
-
-        resultados.append({
-            "tipo": tipo,
-            "expresion_regular": er,
-            "afnd": afnd,
-            "quintupla_afnd": {
-                "Q": afnd["estados"],
-                "Sigma": afnd["alfabeto"],
-                "q0": afnd["inicial"],
-                "F": afnd["finales"],
-                "Delta": afnd["transiciones"]
-            },
-            "afd": afd,
-            "quintupla_afd": {
-                "Q": afd["estados"],
-                "Sigma": afd["alfabeto"],
-                "q0": afd["inicial"],
-                "F": afd["finales"],
-                "Delta": afd["transiciones"]
-            }
-        })
-
-    return resultados
-
-
-# =====================================================
-# RUTAS
-# =====================================================
-
 @app.route("/")
 def inicio():
-    return render_template("index.html")
+    return render_template("index.html", ejemplo=EJEMPLO)
 
 
 @app.route("/analizar", methods=["POST"])
@@ -273,37 +229,45 @@ def analizar():
     codigo = datos.get("codigo", "")
 
     if not isinstance(codigo, str):
-        return jsonify({"error": "El contenido no es válido."}), 400
+        return jsonify({"error": "El contenido enviado no es válido."}), 400
 
-    tokens, errores_lexicos = analizar_tokens(codigo)
-    reglas, errores_reglas = validar_reglas(codigo)
-    errores = errores_lexicos + errores_reglas
+    # Acepta el DSL con envoltura REGISTRO_MEDICO { ... } y procesa
+    # sus líneas Campo: Valor con el mismo analizador de los 13 campos.
+    lineas_procesables = []
+    for linea in codigo.splitlines():
+        limpia = linea.strip()
+        if not limpia or re.fullmatch(r"REGISTRO_MEDICO\\s*\\{", limpia, re.IGNORECASE) or limpia == "}":
+            continue
+        lineas_procesables.append(linea)
+    codigo_normalizado = "\\n".join(lineas_procesables)
+
+    tokens, errores_lexicos = analizar_lexico(codigo_normalizado)
+    reglas, errores_validacion = validar_registro(codigo_normalizado)
+    errores = errores_lexicos + errores_validacion
 
     return jsonify({
         "tokens": tokens,
         "errores": errores,
         "valido": not errores,
-        "expresiones": [
-            {"tipo": tipo, "expresion": er}
-            for tipo, er in EXPRESIONES.items()
-        ],
+        "expresiones": generar_expresiones_regulares(),
         "reglas": reglas,
-        "automatas": generar_automatas()
+        "automatas": generar_automatas(),
+        "campos_obligatorios": CAMPOS,
+        "total_campos": len(CAMPOS)
     })
 
 
 @app.route("/subir", methods=["POST"])
 def subir():
     archivo = request.files.get("archivo")
-
     if not archivo or not archivo.filename:
-        return jsonify({"error": "Selecciona un archivo."}), 400
-
+        return jsonify({"error": "Selecciona un archivo .txt."}), 400
+    if not archivo.filename.lower().endswith(".txt"):
+        return jsonify({"error": "Solo se permiten archivos .txt."}), 400
     try:
         codigo = archivo.read().decode("utf-8-sig")
     except UnicodeDecodeError:
-        return jsonify({"error": "El archivo debe estar en UTF-8."}), 400
-
+        return jsonify({"error": "El archivo debe estar guardado en UTF-8."}), 400
     return jsonify({"codigo": codigo})
 
 
