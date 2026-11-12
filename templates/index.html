@@ -1,134 +1,165 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RuleCheck | Validación de registros médicos ocupacionales</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RuleCheck | Mini compilador médico ocupacional</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-<header class="barra">
-  <div class="marca"><span class="logo">R</span><div><h1>RuleCheck</h1><p>Validador de registros médicos ocupacionales</p></div></div>
-  <span class="estado">ANÁLISIS LÉXICO Y SINTÁCTICO</span>
+<header class="hero">
+  <div class="hero-inner">
+    <div><span class="eyebrow-pill">Teoría de la Computación · RuleCheck</span>
+      <h1>Mini compilador de<br>registros médicos ocupacionales</h1>
+      <p>Validación de un DSL mediante análisis léxico, sintáctico, semántico y autómatas finitos.</p>
+    </div>
+    <div class="hero-tags"><span>DSL médico</span><span>AFND / AFD</span><span>Gramática</span><span>JSON</span></div>
+  </div>
 </header>
+<nav class="quick-nav"><a href="#caso"><b>A</b> Caso</a><a href="#resultado"><b>B</b> Resultado</a><a href="#proceso"><b>C</b> Proceso interno</a></nav>
 
-<main class="contenedor">
-  <section class="introduccion">
-    <p class="etiqueta">VALIDACIÓN AUTOMÁTICA DE INFORMACIÓN</p>
-    <h2>Detección de errores en registros empresariales</h2>
-    <p>Verifica la estructura y el formato de los registros médicos ocupacionales antes de que sean utilizados por el área responsable.</p>
-  </section>
+<main class="container">
+<section class="main-card case-card" id="caso">
+  <h2>A. Caso: validación de registros médicos ocupacionales</h2>
+  <div class="rule"></div>
+  <h3>Problema que se busca resolver</h3>
+  <p>En los procesos de salud ocupacional se reciben registros de trabajadores con información personal, diagnósticos, fechas, horarios y datos de atención. Estos datos pueden llegar incompletos, desordenados o con formatos incorrectos, lo que dificulta su revisión y almacenamiento.</p>
+  <p>RuleCheck utiliza una plantilla para recibir los datos, convertirlos a un lenguaje específico del dominio (DSL) y procesar su estructura mediante un mini compilador. El sistema identifica tokens y lexemas, aplica expresiones regulares, construye autómatas y valida la gramática y las reglas semánticas del registro.</p>
+  <h3>Flujo del proceso empresarial</h3>
+  <div class="flow-grid">
+    <div class="flow-step"><b>1</b><strong>1. Recepción del registro</strong><small>Datos del trabajador y su atención médica.</small></div>
+    <div class="flow-step"><b>2</b><strong>2. Conversión al DSL</strong><small>Organización en el formato REGISTRO_MEDICO.</small></div>
+    <div class="flow-step"><b>3</b><strong>3. Análisis del compilador</strong><small>Tokens, gramática, autómatas y validaciones.</small></div>
+    <div class="flow-step"><b>4</b><strong>4. Resultado estructurado</strong><small>Observaciones y salida JSON para revisión.</small></div>
+  </div>
 
-  <section class="proceso-empresarial">
-    <p class="etiqueta">RUBRO: GESTIÓN DE SALUD OCUPACIONAL</p>
-    <h3>Flujo del proceso empresarial</h3>
-    <div class="flujo-horizontal">
-      <div><b>1. Recepción del registro</b><small>Se recibe la información del trabajador.</small></div>
-      <div><b>2. Conversión al DSL</b><small>Se organiza el registro en el formato de RuleCheck.</small></div>
-      <div><b>3. Análisis léxico y sintáctico</b><small>Se reconocen tokens y se validan los 13 campos.</small></div>
-      <div><b>4. Resultado para el área responsable</b><small>Se muestran errores y observaciones.</small></div>
+  <h3>Ingreso del registro médico</h3>
+  <p>Selecciona cómo deseas ingresar la información.</p>
+  <div class="mode-grid">
+    <label class="mode-option selected"><input type="radio" name="modo" value="plantilla" checked><span>Completar plantilla web</span></label>
+    <label class="mode-option"><input type="radio" name="modo" value="archivo"><span>Subir plantilla .txt</span></label>
+    <label class="mode-option"><input type="radio" name="modo" value="dsl"><span>Escribir código DSL</span></label>
+  </div>
+  <div id="plantilla" class="mode-content">
+    <div class="form-grid">
+      <label>Nombre<input id="NOMBRE" value="Juan" placeholder="Nombre del trabajador"></label>
+      <label>Apellido<input id="APELLIDO" value="Perez" placeholder="Apellido"></label>
+      <label>DNI<input id="DNI" value="12345678" maxlength="8" placeholder="8 dígitos"></label>
+      <label>Edad<input id="EDAD" value="30" type="number" min="1" max="120"></label>
+      <label>Diagnóstico<input id="DIAGNOSTICO" value="J00" placeholder="Código o descripción"></label>
+      <label>Fecha<input id="FECHA" value="2025-06-10" type="date"></label>
+      <label>Hora<input id="HORA" value="09:15" type="time"></label>
+      <label>Tipo de sangre<select id="TIPO_SANGRE"><option>A+</option><option>A-</option><option>B+</option><option>B-</option><option>AB+</option><option>AB-</option><option>O+</option><option>O-</option></select></label>
+      <label>Exámenes<input id="EXAMENES" value="Hemograma"></label>
+      <label>Hospital / Clínica<input id="HOSPITAL_CLINICA" value="Clinica Central"></label>
+      <label>Laboratorio<input id="LABORATORIO" value="Lab Uno"></label>
+      <label>Salón<input id="SALON" value="MI-P2-103"></label>
+      <label class="wide">Enfermera / Médico<input id="ENFERMERA_MEDICO" value="Dra Lopez"></label>
     </div>
-  </section>
-
-  <section class="panel ingreso-panel">
-    <h3>Ingreso del registro</h3>
-    <p class="subtexto">Selecciona cómo deseas ingresar la información.</p>
-    <div class="modo-ingreso">
-      <label><input type="radio" name="modo" value="formulario" checked> Completar plantilla web</label>
-      <label><input type="radio" name="modo" value="archivo"> Subir plantilla .txt</label>
-      <label><input type="radio" name="modo" value="dsl"> Escribir código DSL</label>
-    </div>
-
-    <section id="modoFormulario" class="modo-contenido">
-      <h4>Plantilla de registro médico ocupacional</h4>
-      <form id="formRegistro">
-        <fieldset>
-          <legend>Datos personales</legend>
-          <div class="form-grid">
-            <label>Nombre<input name="Nombre" placeholder="Juan"></label>
-            <label>Apellido<input name="Apellido" placeholder="Perez"></label>
-            <label>DNI<input name="DNI" inputmode="numeric" placeholder="12345678"></label>
-            <label>Edad<input name="Edad" inputmode="numeric" placeholder="30"></label>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Información médica</legend>
-          <div class="form-grid">
-            <label>Diagnóstico<input name="Diagnostico" placeholder="J00"></label>
-            <label>Fecha<input name="Fecha" placeholder="2025-06-10"></label>
-            <label>Hora<input name="Hora" placeholder="09:15"></label>
-            <label>Tipo de sangre<input name="Tipo de sangre" placeholder="A+"></label>
-            <label>Exámenes<input name="Examenes" placeholder="Hemograma"></label>
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>Centro y personal responsable</legend>
-          <div class="form-grid">
-            <label>Hospital / Clínica<input name="Hospital/Clinica" placeholder="Clinica Central"></label>
-            <label>Laboratorio<input name="Laboratorio" placeholder="Lab Uno"></label>
-            <label>Salón<input name="Salon" placeholder="MI-P2-103"></label>
-            <label>Enfermera / Médico<input name="Enfermera/Medico" placeholder="Dra Lopez"></label>
-          </div>
-        </fieldset>
-        <div class="acciones">
-          <button class="principal" type="submit">Analizar y validar registro</button>
-          <button class="secundario" type="button" id="ejemploFormulario">Cargar ejemplo</button>
-        </div>
-      </form>
-    </section>
-
-    <section id="modoArchivo" class="modo-contenido oculto">
-      <h4>Cargar plantilla de registro</h4>
-      <button type="button" class="secundario" id="descargarPlantilla">Descargar plantilla vacía (.txt)</button>
-      <div class="archivo-linea"><label for="archivo">Selecciona un archivo de texto:</label><input type="file" id="archivo" accept=".txt"></div>
-      <p class="ayuda">Completa la plantilla descargada y súbela. También puedes cargar un archivo .txt que ya contenga el registro completo.</p>
-      <button type="button" class="principal" id="analizarArchivo">Analizar y validar registro</button>
-    </section>
-
-    <section id="modoDsl" class="modo-contenido oculto">
-      <h4>Ingreso directo del DSL</h4>
-      <p class="ayuda">Esta modalidad permite comprobar el funcionamiento del analizador léxico y sintáctico con la estructura del lenguaje de dominio de RuleCheck.</p>
-      <textarea id="codigoDsl" class="editor-dsl" spellcheck="false" placeholder="REGISTRO_MEDICO {
+  </div>
+  <div id="archivo" class="mode-content hidden">
+    <label class="upload-zone" for="archivoTxt"><span class="upload-icon">📁</span><strong>Seleccionar archivo TXT</strong><small>Debe contener un registro con la estructura REGISTRO_MEDICO.</small><em id="nombreArchivo">Ningún archivo seleccionado</em></label>
+    <input type="file" id="archivoTxt" accept=".txt" hidden>
+  </div>
+  <div id="dsl" class="mode-content hidden">
+    <label class="field-caption" for="codigoDSL">CÓDIGO DSL · REGISTRO_MEDICO</label>
+    <textarea id="codigoDSL" spellcheck="false">REGISTRO_MEDICO {
 NOMBRE: Juan
 APELLIDO: Perez
 DNI: 12345678
-...
-}"></textarea>
-      <div class="acciones">
-        <button type="button" class="principal" id="analizarDsl">Analizar y validar registro</button>
-        <button type="button" class="secundario" id="ejemploDsl">Cargar ejemplo DSL</button>
-      </div>
-      <details class="ejemplo-plegable">
-        <summary>Ver ejemplo del lenguaje DSL</summary>
-        <pre id="ejemploCodigoDsl"></pre>
-      </details>
-    </section>
-    <p id="mensaje" role="status" class="mensaje">Selecciona una modalidad e ingresa el registro.</p>
+EDAD: 30
+DIAGNOSTICO: J00
+FECHA: 2025-06-10
+HORA: 09:15
+TIPO_SANGRE: A+
+EXAMENES: Hemograma
+HOSPITAL_CLINICA: Clinica Central
+LABORATORIO: Lab Uno
+SALON: MI-P2-103
+ENFERMERA_MEDICO: Dra Lopez
+}</textarea>
+  </div>
+  <div class="actions"><button id="btnAnalizar" class="btn primary">Analizar y compilar registro</button><button id="btnEjemplo" class="btn secondary">Cargar ejemplo</button><button id="btnLimpiar" class="btn ghost">Limpiar</button></div>
+  <div id="mensaje" class="notice hidden"></div>
+</section>
+
+<section class="main-card result-card hidden" id="resultado">
+  <h2>B. Resultado del registro médico</h2><div class="rule"></div>
+  <div id="estadoBadge" class="result-banner"></div>
+  <p id="estadoDescripcion"></p>
+  <p><strong>Origen de la información:</strong> <span id="origenInfo">DSL ingresado manualmente</span></p>
+  <div class="metrics">
+    <div><small>TOKENS RECONOCIDOS</small><strong id="totalTokens">0</strong></div>
+    <div><small>CAMPOS RECONOCIDOS</small><strong id="totalCampos">0/13</strong></div>
+    <div><small>ERRORES DETECTADOS</small><strong id="totalErrores">0</strong></div>
+  </div>
+  <h3>Representación intermedia: objeto JSON</h3>
+  <p>Información estructurada generada después del procesamiento del registro.</p>
+  <pre id="resultadoJSON" class="json-box"></pre>
+  <div class="actions"><button id="btnJSON" class="btn secondary">Descargar resultado JSON</button><button id="btnPDF" class="btn primary">Descargar reporte PDF</button></div>
+</section>
+
+<section class="main-card process-card hidden" id="proceso">
+  <h2>C. Proceso interno del mini compilador</h2><div class="rule"></div>
+  <section class="subsection">
+    <h3>3.1 Análisis léxico</h3>
+    <p>El analizador léxico identifica los lexemas del registro y los clasifica mediante tokens agrupadores y expresiones regulares.</p>
+    <h4>Tabla de tokens agrupadores</h4>
+    <p class="muted">Cada token representa una categoría del lenguaje. Los lexemas son los nombres de campos que pertenecen a esa categoría.</p>
+    <div class="table-wrap"><table class="group-regex-table"><thead><tr><th rowspan="2">Token agrupador</th><th rowspan="2">Lexemas permitidos</th><th colspan="3" class="regex-superhead">Expresiones regulares</th></tr><tr><th>Notación Regex</th><th>Lenguaje</th><th>Notación por conjuntos</th></tr></thead><tbody id="tablaGrupos"></tbody></table></div>
+    <h4>Relación entre tokens, expresiones regulares y autómatas</h4>
+    <div class="table-wrap"><table><thead><tr><th>Token agrupador</th><th>Lexema o contexto</th><th>Regla de reconocimiento</th><th>Autómata relacionado</th></tr></thead><tbody id="tablaRelacion"></tbody></table></div>
+    <div class="callout">Los tokens agrupadores clasifican los identificadores del DSL. Cada campo conserva su propia expresión regular para validar el valor que contiene.</div>
+    <h4>Expresiones regulares del DSL</h4>
+    <div class="table-wrap"><table><thead><tr><th>Campo</th><th>Expresión regular</th><th>Ejemplo válido</th><th>Descripción</th></tr></thead><tbody id="tablaER"></tbody></table></div>
+    <h4>Secuencia de tokens reconocidos</h4>
+    <p class="muted">Secuencia léxica en el orden original de la entrada, con el número de línea correspondiente.</p>
+    <div class="table-wrap"><table><thead><tr><th>N.º</th><th>Token</th><th>Lexema</th><th>Línea</th></tr></thead><tbody id="tablaSecuencia"></tbody></table></div>
   </section>
 
-  <section id="resultados" class="resultados">
-    <div class="titulo-panel">
-      <div><h3>Resultado del análisis</h3><p>Tokens, lexemas, validación y autómatas generados.</p></div>
-      <span id="estadoResultado" class="insignia">Sin analizar</span>
+  <section class="subsection">
+    <h3>3.2 Autómatas finitos del lenguaje</h3>
+    <p>Selecciona un campo para consultar su ER, AFND, AFD, tablas de transición y quíntupla. Los diagramas se generan a partir de las transiciones calculadas.</p>
+    <div class="automata-select-row"><label for="selectorAutomata">Token o regla:</label><select id="selectorAutomata"></select></div>
+    <div id="detalleAutomata" class="automata-detail"><p>Analiza un registro para generar los autómatas.</p></div>
+    <div class="simulator">
+      <h4>Simulador de cadenas</h4>
+      <p class="muted">Comprueba si una cadena pertenece al lenguaje reconocido por el AFD seleccionado.</p>
+      <div class="sim-row"><input id="cadenaSimular" placeholder="Escribe una cadena, por ejemplo 12345678"><button id="btnSimular" class="btn primary">Simular cadena</button></div>
+      <div id="resultadoSimulacion" class="simulation-result">Selecciona una regla y escribe una cadena.</div>
     </div>
-    <div class="resumen">
-      <div class="tarjeta"><span>Tokens identificados</span><strong id="totalTokens">0</strong></div>
-      <div class="tarjeta"><span>Errores detectados</span><strong id="totalErrores">0</strong></div>
-      <div class="tarjeta"><span>Campos válidos</span><strong id="totalValidos">0 / 13</strong></div>
-    </div>
-    <h4>1. Tokens y lexemas</h4>
-    <div class="tabla-contenedor"><table><thead><tr><th>Token</th><th>Lexema</th><th>Posición</th><th>Descripción</th><th>Ejemplo</th></tr></thead><tbody id="tablaTokens"><tr><td colspan="5">Sin resultados.</td></tr></tbody></table></div>
-    <h4>2. Expresiones regulares (ER)</h4>
-    <div class="tabla-contenedor"><table><thead><tr><th>Tipo de lexema</th><th>Descripción</th><th>Ejemplo</th><th>Expresión regular</th></tr></thead><tbody id="tablaER"><tr><td colspan="4">Sin resultados.</td></tr></tbody></table></div>
-    <h4>3. Validación sintáctica y de campos</h4>
-    <div class="tabla-contenedor"><table><thead><tr><th>Línea</th><th>Campo / contenido</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody id="tablaReglas"><tr><td colspan="4">Sin resultados.</td></tr></tbody></table></div>
-    <h4>4. Autómatas y quíntuplas</h4>
-    <div id="contenedorAutomatas" class="automatas">Ejecuta el análisis para generar los autómatas.</div>
-    <h4>5. Errores y recomendaciones</h4>
-    <div id="listaErrores" class="errores">Sin resultados.</div>
   </section>
+
+  <section class="subsection">
+    <h3>3.3 Análisis sintáctico</h3>
+    <p>La gramática libre de contexto establece la estructura que debe cumplir el lenguaje REGISTRO_MEDICO.</p>
+    <h4>Gramática del lenguaje</h4>
+    <div id="gramaticaFormal" class="grammar-summary"></div>
+    <div class="table-wrap"><table><thead><tr><th>Producción</th><th>Regla gramatical</th></tr></thead><tbody id="tablaGramatica"></tbody></table></div>
+    <h4>Resultado del análisis sintáctico</h4><div id="estadoSintactico" class="status-box"></div>
+    <h4>Secuencia de terminales reconocidos</h4><div id="secuenciaSintactica" class="code-box"></div>
+    <h4>Pasos del análisis predictivo</h4><div class="table-wrap"><table><thead><tr><th>Paso</th><th>Operación</th></tr></thead><tbody id="tablaPasos"></tbody></table></div>
+    <h4>Árbol sintáctico / árbol de derivación</h4>
+    <p class="muted">El árbol se construye usando las producciones aplicadas por el parser.</p>
+    <div id="arbolSintactico" class="tree-canvas"></div>
+  </section>
+
+  <section class="subsection">
+    <h3>3.4 Análisis semántico</h3>
+    <p>Se comprueba que los campos obligatorios estén presentes y que sus valores respeten el tipo y las restricciones definidas para el registro médico.</p>
+    <div class="table-wrap"><table><thead><tr><th>Campo</th><th>Tipo esperado</th><th>Valor recibido</th><th>Regla semántica</th><th>Estado</th></tr></thead><tbody id="tablaSemantica"></tbody></table></div>
+    <h4>Atributos sintetizados</h4><div id="atributosSintetizados" class="code-box"></div>
+    <h4>Atributos heredados</h4><div id="atributosHeredados" class="code-box"></div>
+    <h4>Árbol semántico</h4><div id="arbolSemantico" class="tree-canvas compact-tree"></div>
+  </section>
+
+  <section class="subsection">
+    <h3>3.5 Traducción del DSL a JSON</h3>
+    <p>Cuando el análisis termina, RuleCheck transforma los campos reconocidos en un objeto JSON para su almacenamiento o revisión posterior.</p>
+    <pre id="jsonProceso" class="json-box"></pre>
+  </section>
+  <section class="subsection error-section hidden" id="erroresPanel"><h3>Errores y observaciones</h3><ul id="listaErrores"></ul></section>
+</section>
+<footer><strong>RuleCheck</strong><span>Mini compilador de registros médicos ocupacionales · Teoría de la Computación</span></footer>
 </main>
-<footer>RuleCheck · Detección y validación automática de errores mediante análisis de reglas</footer>
 <script src="{{ url_for('static', filename='app.js') }}"></script>
-</body>
-</html>
+</body></html>
