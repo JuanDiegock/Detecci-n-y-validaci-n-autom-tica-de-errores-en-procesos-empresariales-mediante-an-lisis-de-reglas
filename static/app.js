@@ -1,19 +1,14 @@
-const $ = (id) => document.getElementById(id);
-const campos = ["Nombre","Apellido","DNI","Edad","Diagnostico","Fecha","Hora","Hospital/Clinica","Laboratorio","Salon","Examenes","Enfermera/Medico","Tipo de sangre"];
-const ejemplo = `Nombre: Juan
-Apellido: Perez
-DNI: 12345678
-Edad: 30
-Diagnostico: J00
-Fecha: 2025-06-10
-Hora: 09:15
-Hospital/Clinica: Clinica Central
-Laboratorio: Lab Uno
-Salon: MI-P2-103
-Examenes: Hemograma
-Enfermera/Medico: Dra Lopez
-Tipo de sangre: A+`;
-const ejemploDSL = `REGISTRO_MEDICO {
+const $=id=>document.getElementById(id);
+const CAMPOS=["NOMBRE","APELLIDO","DNI","EDAD","DIAGNOSTICO","FECHA","HORA","TIPO_SANGRE","EXAMENES","HOSPITAL_CLINICA","LABORATORIO","SALON","ENFERMERA_MEDICO"];
+const GRUPOS=[
+ {token:"mis_variables_numericas",campos:["DNI","EDAD"],funcion:"Valores numéricos",color:"violet"},
+ {token:"mis_variables_texto",campos:["NOMBRE","APELLIDO","DIAGNOSTICO","EXAMENES","HOSPITAL_CLINICA","LABORATORIO","SALON","ENFERMERA_MEDICO"],funcion:"Valores de texto",color:"blue"},
+ {token:"mis_variables_fecha",campos:["FECHA"],funcion:"Fecha calendario",color:"green"},
+ {token:"mis_variables_hora",campos:["HORA"],funcion:"Hora HH:MM",color:"orange"},
+ {token:"mis_variables_sanguineas",campos:["TIPO_SANGRE"],funcion:"Grupo sanguíneo",color:"pink"},
+ {token:"separadores",campos:[":"],funcion:"Separador campo / valor",color:"slate"}
+];
+const EJEMPLO=`REGISTRO_MEDICO {
 NOMBRE: Juan
 APELLIDO: Perez
 DNI: 12345678
@@ -21,181 +16,229 @@ EDAD: 30
 DIAGNOSTICO: J00
 FECHA: 2025-06-10
 HORA: 09:15
+TIPO_SANGRE: A+
+EXAMENES: Hemograma
 HOSPITAL_CLINICA: Clinica Central
 LABORATORIO: Lab Uno
 SALON: MI-P2-103
-EXAMENES: Hemograma
 ENFERMERA_MEDICO: Dra Lopez
-TIPO_SANGRE: A+
 }`;
-$("ejemploCodigoDsl").textContent = ejemploDSL;
-
-document.querySelectorAll('input[name="modo"]').forEach(r => r.addEventListener("change", () => {
-  ["Formulario","Archivo","Dsl"].forEach((name, i) => $("modo"+name).classList.toggle("oculto", ["formulario","archivo","dsl"][i] !== r.value));
-  $("mensaje").textContent = "Modalidad seleccionada: " + r.parentElement.textContent.trim();
-}));
-
-$("ejemploFormulario").addEventListener("click", () => {
-  const values = Object.fromEntries(ejemplo.split("\n").map(l => { const i=l.indexOf(":"); return [l.slice(0,i),l.slice(i+1).trim()]; }));
-  const form = $("formRegistro");
-  Object.entries(values).forEach(([k,v]) => { if(form.elements[k]) form.elements[k].value=v; });
-  $("mensaje").textContent = "Ejemplo cargado en la plantilla.";
-});
-$("ejemploDsl").addEventListener("click", () => { $("codigoDsl").value=ejemploDSL; $("mensaje").textContent="Ejemplo DSL cargado."; });
-$("descargarPlantilla").addEventListener("click", () => descargarTxt("plantilla_rulecheck.txt", ejemplo.split("\n").map(l=>l.replace(/:.*/,": ")).join("\n")));
-function descargarTxt(nombre, contenido) {
-  const blob = new Blob([contenido], {type:"text/plain;charset=utf-8"});
-  const url = URL.createObjectURL(blob); const a=document.createElement("a");
-  a.href=url; a.download=nombre; a.click(); URL.revokeObjectURL(url);
+const DESCRIPCIONES={
+NOMBRE:"Nombre del trabajador",APELLIDO:"Apellido del trabajador",DNI:"Documento de identidad de ocho dígitos",EDAD:"Edad entre 1 y 120 años",DIAGNOSTICO:"Código o descripción del diagnóstico",FECHA:"Fecha válida AAAA-MM-DD",HORA:"Hora válida HH:MM",TIPO_SANGRE:"Grupo sanguíneo y factor RH",EXAMENES:"Exámenes médicos realizados",HOSPITAL_CLINICA:"Centro de atención",LABORATORIO:"Laboratorio responsable",SALON:"Código de salón o consultorio",ENFERMERA_MEDICO:"Profesional responsable"
+};
+let ultimo=null, automatas=[], campoSeleccionado="DNI";
+function mode(){return document.querySelector('input[name="modo"]:checked').value;}
+function changeMode(){const m=mode();["plantilla","archivo","dsl"].forEach(x=>$(x).classList.toggle("hidden",x!==m));document.querySelectorAll(".mode-option").forEach(x=>x.classList.toggle("selected",x.querySelector("input").checked));}
+document.querySelectorAll('input[name="modo"]').forEach(x=>x.addEventListener("change",changeMode));
+function plantillaDSL(){return "REGISTRO_MEDICO {\n"+CAMPOS.map(c=>`${c}: ${($(c).value||"").trim()}`).join("\n")+"\n}";}
+async function textoEntrada(){if(mode()==="plantilla")return plantillaDSL();if(mode()==="dsl")return $("codigoDSL").value.trim();const f=$("archivoTxt").files[0];if(!f)throw Error("Selecciona un archivo TXT.");if(!f.name.toLowerCase().endsWith(".txt"))throw Error("El archivo debe tener extensión .txt.");return await f.text();}
+function notice(msg,kind="success"){const el=$("mensaje");el.textContent=msg;el.className=`notice ${kind}`;}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function cellRow(values){const tr=document.createElement("tr");values.forEach(v=>{const td=document.createElement("td");td.textContent=String(v??"");tr.appendChild(td);});return tr;}
+function fill(id,rows){const b=$(id);b.innerHTML="";rows.forEach(r=>b.appendChild(cellRow(r)));}
+function valueToken(campo){const mapping={DNI:"VALOR_NUMERICO",EDAD:"VALOR_NUMERICO",FECHA:"VALOR_FECHA",HORA:"VALOR_HORA",TIPO_SANGRE:"VALOR_SANGUINEO"};return mapping[campo]||"VALOR_TEXTO";}
+function tokenAgrupador(campo){return GRUPOS.find(g=>g.campos.includes(campo))?.token||"—";}
+function regexLiteralAlternation(values){
+ return "^("+values.map(v=>v.replace(/[.*+?^${}()|[\\]\\\\]/g,"\\\\$&")).join("|")+")$";
 }
-$("formRegistro").addEventListener("submit", e => {
-  e.preventDefault();
-  const fd = new FormData(e.currentTarget);
-  const lineas = campos.map(c => `${c}: ${String(fd.get(c)||"").trim()}`);
-  analizar(lineas.join("\n"));
-});
-$("analizarDsl").addEventListener("click", () => analizar($("codigoDsl").value));
-$("analizarArchivo").addEventListener("click", async () => {
-  const f=$("archivo").files[0];
-  if(!f) return $("mensaje").textContent="Selecciona primero un archivo .txt.";
-  if(!f.name.toLowerCase().endsWith(".txt")) return $("mensaje").textContent="Solo se permiten archivos .txt.";
-  const fd=new FormData(); fd.append("archivo",f);
-  try {
-    const res=await fetch("/subir",{method:"POST",body:fd}); const data=await res.json();
-    if(!res.ok) throw new Error(data.error||"No se pudo cargar el archivo.");
-    await analizar(data.codigo);
-  } catch(err) { $("mensaje").textContent="Error: "+err.message; }
-});
-$("archivo").addEventListener("change", () => { if($("archivo").files[0]) $("mensaje").textContent="Archivo seleccionado. Presiona «Analizar y validar registro»."; });
-
-async function analizar(codigo) {
-  if(!codigo.trim()) return $("mensaje").textContent="Ingresa o carga un registro antes de analizar.";
-  $("mensaje").textContent="Analizando el registro...";
-  document.querySelectorAll(".principal").forEach(b=>b.disabled=true);
-  try {
-    const res=await fetch("/analizar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({codigo})});
-    const data=await res.json(); if(!res.ok) throw new Error(data.error||"No se pudo analizar.");
-    mostrarTokens(data.tokens||[]); mostrarER(data.expresiones||[]); mostrarReglas(data.reglas||[]);
-    mostrarAutomatas(data.automatas||[]); mostrarErrores(data.errores||[]);
-    $("totalTokens").textContent=(data.tokens||[]).length;
-    $("totalErrores").textContent=(data.errores||[]).length;
-    const validos=(data.reglas||[]).filter(r=>r.coincide).length;
-    $("totalValidos").textContent=`${Math.min(validos,13)} / 13`;
-    $("estadoResultado").textContent=data.valido?"Registro válido":"Requiere correcciones";
-    $("estadoResultado").className="insignia "+(data.valido?"ok":"alerta");
-    $("mensaje").textContent=data.valido?"Análisis completado. Los 13 campos cumplen los formatos establecidos.":"Análisis completado. Revisa los errores y las observaciones del reporte.";
-    $("resultados").scrollIntoView({behavior:"smooth",block:"start"});
-  } catch(err) { $("mensaje").textContent="Error: "+err.message; }
-  finally { document.querySelectorAll(".principal").forEach(b=>b.disabled=false); }
+function setNotation(values){
+ if(values[0]===":") return 'L = { x ∈ Σ* | x = ":" }';
+ return "L = { "+values.map(v=>'"'+v+'"').join(", ")+" }";
 }
-function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=String(text);if(cls)e.className=cls;return e;}
-function emptyRow(tbody,n,msg){const tr=document.createElement("tr"),td=node("td",msg);td.colSpan=n;tr.appendChild(td);tbody.appendChild(tr);}
-function addRow(tbody,values){const tr=document.createElement("tr");values.forEach(v=>tr.appendChild(node("td",v??"—")));tbody.appendChild(tr);}
-function renderTable(id,rows,n,empty){
-  const tb=$(id);tb.replaceChildren();if(!rows.length){emptyRow(tb,n,empty);return;}
-  rows.forEach(r=>addRow(tb,r));
+function setBuilderNotation(values){
+ if(values[0]===":") return '{ x ∈ Σ* | x = ":" }';
+ return "{ x ∈ Σ* | "+values.map(v=>'x = "'+v+'"').join(" ∨ ")+" }";
 }
-function mostrarTokens(tokens){renderTable("tablaTokens",tokens.map(t=>[t.token,t.lexema,t.posicion,t.descripcion||"—",t.ejemplo||"—"]),5,"No se identificaron tokens.");}
-function mostrarER(items){renderTable("tablaER",items.map(e=>[e.tipo,e.descripcion||"Patrón de reconocimiento",e.ejemplo||"—",e.expresion]),4,"Sin expresiones regulares.");}
-function mostrarReglas(items){renderTable("tablaReglas",items.map(r=>[r.linea,r.regla,r.coincide?"Válido":"Inválido",r.detalle||""]),4,"No hay campos para validar.");}
-function mostrarErrores(items){
-  const box=$("listaErrores");box.replaceChildren();
-  if(!items.length){box.appendChild(node("div","No se detectaron errores. Los 13 campos cumplen las reglas definidas.","exito"));return;}
-  items.forEach(e=>box.appendChild(node("div",`Línea ${e.posicion}: ${e.mensaje}`,"error")));
+function renderGroups(r){
+ const rows=GRUPOS.map(g=>{
+  const values=g.campos;
+  const regex=regexLiteralAlternation(values);
+  const language=setNotation(values);
+  const sets=setBuilderNotation(values);
+  return [g.token,values.join(", "),regex,language,sets];
+ });
+ fill("tablaGrupos",rows);
+ const relation=[];
+ CAMPOS.forEach(c=>{const g=GRUPOS.find(x=>x.campos.includes(c));relation.push([g.token,c,r.expresiones.find(x=>x.lexema===c)?.regex||"—",`AFND / AFD de ${c}`]);});
+ relation.push(["separadores",":","Símbolo literal ':'","Transición de separación"]);
+ fill("tablaRelacion",relation);
+ fill("tablaER",(r.expresiones||[]).map(e=>[e.lexema,e.regex,(data[e.lexema]??exampleValue(e.lexema)),DESCRIPCIONES[e.lexema]||"Regla de campo"]));
 }
-function tableTransitions(transitions){
-  const wrap=node("div",undefined,"tabla-contenedor tabla-transiciones");
-  const table=document.createElement("table"),thead=document.createElement("thead"),tr=document.createElement("tr");
-  ["Origen","Símbolo","Destino"].forEach(x=>tr.appendChild(node("th",x)));
-  thead.appendChild(tr);table.appendChild(thead);
-  const tb=document.createElement("tbody");
-  if(!transitions?.length)emptyRow(tb,3,"Sin transiciones.");
-  else transitions.forEach(t=>addRow(tb,[t.origen,t.simbolo,t.destino]));
-  table.appendChild(tb);wrap.appendChild(table);return wrap;
+function exampleValue(c){return ({NOMBRE:"Juan",APELLIDO:"Perez",DNI:"12345678",EDAD:"30",DIAGNOSTICO:"J00",FECHA:"2025-06-10",HORA:"09:15",TIPO_SANGRE:"A+",EXAMENES:"Hemograma",HOSPITAL_CLINICA:"Clinica Central",LABORATORIO:"Lab Uno",SALON:"MI-P2-103",ENFERMERA_MEDICO:"Dra Lopez"})[c]||"";}
+function renderSequence(r){
+ const syn=r.tokens_sintacticos||[], rows=[];
+ syn.forEach(t=>{
+  let token=t.tipo, lex=t.lexema;
+  if(t.tipo==="REGISTRO_MEDICO")token="TK_DECLARACION";
+  else if(t.tipo==="LLAVE_ABRE"||t.tipo==="LLAVE_CIERRA")token="TK_LLAVE";
+  else if(t.tipo==="IDENTIFICADOR")token=tokenAgrupador(t.lexema);
+  else if(t.tipo==="DOS_PUNTOS")token="separadores";
+  else if(t.tipo.startsWith("VALOR_"))token=t.tipo;
+  rows.push([rows.length+1,token,lex,t.linea]);
+ });
+ fill("tablaSecuencia",rows);
+ $("secuenciaSintactica").textContent=syn.map(t=>`${t.tipo}  →  ${t.lexema}  (línea ${t.linea})`).join("\n")||"No se reconocieron terminales.";
 }
-function quintupla(a){
-  const wrap=node("div",undefined,"tabla-contenedor");
-  const p=node("p","M = (Q, Σ, δ, q₀, F)","formula-quintupla");wrap.appendChild(p);
-  const table=document.createElement("table"),thead=document.createElement("thead"),tr=document.createElement("tr");
-  ["Componente","Valor"].forEach(x=>tr.appendChild(node("th",x)));thead.appendChild(tr);table.appendChild(thead);
-  const tb=document.createElement("tbody");
-  [[ "Q - Estados",`{ ${a.estados.join(", ")} }`],["Σ - Alfabeto",`{ ${a.alfabeto.join(", ")} }`],["δ - Transiciones","Ver tabla de transiciones"],["q₀ - Estado inicial",a.inicial],["F - Estados finales",`{ ${a.finales.join(", ")} }`]].forEach(r=>addRow(tb,r));
-  table.appendChild(tb);wrap.appendChild(table);return wrap;
+function renderGrammar(r){
+ const formal=$("gramaticaFormal");
+ formal.textContent="G = (V, T, P, S)\\nV = {S, REGISTRO, LISTA_CAMPOS, CAMPO, IDENTIFICADOR, VALOR}\\nT = {REGISTRO_MEDICO, LLAVE_ABRE, LLAVE_CIERRA, DOS_PUNTOS, VALOR_TEXTO, VALOR_NUMERICO, VALOR_FECHA, VALOR_HORA, VALOR_SANGUINEO}\\nP = producciones mostradas en la tabla siguiente\\nS = REGISTRO";
+ fill("tablaGramatica",(r.producciones||[]).map((p,i)=>[i+1,p]));
+ fill("tablaPasos",(r.pasos_sintacticos||[]).map((p,i)=>[i+1,p]));
+ const errors=r.errores_sintacticos||[];
+ $("estadoSintactico").textContent=errors.length?("Cadena rechazada por el parser:\n"+errors.join("\n")):"La estructura fue aceptada por el parser descendente. Se aplicaron las producciones de la gramática.";
+ $("estadoSintactico").className="status-box "+(errors.length?"bad":"good");
 }
-let diagramCount=0;
-function compactSymbol(symbol){
-  if (/^\d$/.test(symbol)) return "D";
-  if (/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]$/.test(symbol)) return "L";
-  return symbol;
+function renderTree(node,depth=0){
+ const wrap=document.createElement("div");wrap.className="tree-node";
+ const label=document.createElement("span");label.textContent=node.nombre;wrap.appendChild(label);
+ if(node.hijos?.length){const children=document.createElement("div");children.className="tree-children";node.hijos.forEach(ch=>children.appendChild(renderTree(ch,depth+1)));wrap.appendChild(children);}
+ return wrap;
 }
-function makeDiagram(a,type){
-  const ns="http://www.w3.org/2000/svg", svg=document.createElementNS(ns,"svg");
-  const states=a.estados||[], raw=a.transiciones||[], finals=new Set(a.finales||[]);
-  const perRow=5, gapX=145, gapY=155, marginX=78, marginY=82, radius=25;
-  const rows=Math.max(1,Math.ceil(states.length/perRow));
-  const width=Math.max(760,marginX*2+(perRow-1)*gapX+80), height=Math.max(310,marginY*2+(rows-1)*gapY+70);
-  svg.setAttribute("viewBox",`0 0 ${width} ${height}`);svg.setAttribute("role","img");svg.setAttribute("aria-label",`${type} de ${a.tipo}`);
-  const defs=document.createElementNS(ns,"defs"),marker=document.createElementNS(ns,"marker"),id=`arr-${++diagramCount}`;
-  marker.setAttribute("id",id);marker.setAttribute("markerWidth","9");marker.setAttribute("markerHeight","9");marker.setAttribute("refX","8");marker.setAttribute("refY","3");marker.setAttribute("orient","auto");
-  const tip=nodeSvg("path","");tip.setAttribute("d","M0,0 L0,6 L8,3 z");tip.setAttribute("fill",type==="AFND"?"#2679b8":"#218653");marker.appendChild(tip);defs.appendChild(marker);svg.appendChild(defs);
-  const pos={};
-  states.forEach((state,i)=>{const row=Math.floor(i/perRow),idx=i%perRow,col=row%2===0?idx:perRow-1-idx;pos[state]={x:marginX+col*gapX,y:marginY+row*gapY};});
-  const color=type==="AFND"?"#2679b8":"#218653";
-  // Agrupa transiciones paralelas para evitar etiquetas y flechas superpuestas.
-  const grouped=new Map();
-  raw.forEach(t=>{const key=`${t.origen}→${t.destino}`;if(!grouped.has(key))grouped.set(key,{origen:t.origen,destino:t.destino,simbolos:[]});grouped.get(key).simbolos.push(t.simbolo);});
-  const edges=[...grouped.values()];
-  edges.forEach((t,i)=>{
-    const a1=pos[t.origen],b=pos[t.destino];if(!a1||!b)return;
-    const path=document.createElementNS(ns,"path");let d,lx,ly;
-    if(t.origen===t.destino){d=`M${a1.x-13},${a1.y-radius+2} C${a1.x-48},${a1.y-83} ${a1.x+48},${a1.y-83} ${a1.x+13},${a1.y-radius+2}`;lx=a1.x;ly=a1.y-61;}
-    else {
-      const dx=b.x-a1.x,dy=b.y-a1.y;
-      const offset=((i%3)-1)*15;
-      const mx=(a1.x+b.x)/2-dy/(Math.hypot(dx,dy)||1)*offset;
-      const my=(a1.y+b.y)/2+dx/(Math.hypot(dx,dy)||1)*offset-((Math.abs(dy)<5)?28:0);
-      d=`M${a1.x+Math.sign(dx||1)*radius},${a1.y} Q${mx},${my} ${b.x-Math.sign(dx||1)*radius},${b.y}`;lx=mx;ly=my-8;
-    }
-    path.setAttribute("d",d);path.setAttribute("fill","none");path.setAttribute("stroke",color);path.setAttribute("stroke-width","2");path.setAttribute("marker-end",`url(#${id})`);svg.appendChild(path);
-    const labels=[...new Set(t.simbolos.map(compactSymbol))];
-    const label=nodeSvg("text",labels.length>4?`${labels.slice(0,3).join(", ")}…`:labels.join(", "));
-    label.setAttribute("x",lx);label.setAttribute("y",ly);label.setAttribute("text-anchor","middle");label.setAttribute("class","etiqueta-transicion");svg.appendChild(label);
+function treeInto(id,node){const el=$(id);el.innerHTML="";if(node)el.appendChild(renderTree(node));}
+function renderSemantic(r){
+ const data=r.datos||{}, errors=r.errores||[];
+ const rows=CAMPOS.map(c=>{const val=data[c]??"—", exists=Object.hasOwn(data,c), invalid=errors.some(e=>e.startsWith(c+":"));return [c,valueToken(c),val,DESCRIPCIONES[c],!exists?"FALTANTE":invalid?"INVÁLIDO":"VÁLIDO"];});
+ fill("tablaSemantica",rows);
+ $("atributosSintetizados").textContent=`campos_reconocidos = ${r.campos_reconocidos}/${r.total_campos}\ntokens_reconocidos = ${r.total_tokens}\nregistro_valido = ${r.valido}\nestado = ${r.estado}`;
+ $("atributosHeredados").textContent="contexto = REGISTRO_MEDICO\ntipos_esperados = configuración de CAMPOS\nreglas = campos obligatorios + expresiones regulares + restricciones de dominio";
+ const sem={nombre:"REGISTRO_MEDICO",hijos:CAMPOS.map(c=>({nombre:`${c} · ${Object.hasOwn(data,c)?"PRESENTE":"FALTANTE"}`,hijos:[{nombre:String(data[c]??"—"),hijos:[]}]}))};
+ treeInto("arbolSemantico",sem);
+}
+function svg(tag,attrs={}){const e=document.createElementNS("http://www.w3.org/2000/svg",tag);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));return e;}
+function groupTransitions(transitions){const map=new Map();transitions.forEach(t=>{const key=t.from+"|"+t.to;map.set(key,[...(map.get(key)||[]),t.symbol]);});return [...map.entries()].map(([key,symbols])=>{const [from,to]=key.split("|");return {from,to,symbols};});}
+function graphFor(automaton,type){
+ const states=automaton.states||[];
+ const transitions=type==="AFND"
+  ?states.flatMap(s=>(s.transitions||[]).map(t=>({from:s.id,to:t.to,symbol:t.symbol})))
+  :(automaton.transitions||[]).map(t=>({from:t.from,to:t.to,symbol:t.symbol}));
+ const byId=new Map(states.map(s=>[s.id,s]));
+ const outgoing=new Map(states.map(s=>[s.id,[]]));
+ transitions.forEach(t=>{if(outgoing.has(t.from))outgoing.get(t.from).push(t);});
+ // JFLAP-like layered layout: initial state at left, accepting states toward the right.
+ const start=automaton.start||states[0]?.id;
+ const level=new Map(); if(start)level.set(start,0);
+ const queue=start?[start]:[];
+ while(queue.length){
+  const current=queue.shift();
+  for(const edge of outgoing.get(current)||[]){
+   if(!level.has(edge.to)){level.set(edge.to,level.get(current)+1);queue.push(edge.to);}
+  }
+ }
+ // Keep unreachable states visible in subsequent columns.
+ let maxLevel=Math.max(0,...level.values());
+ states.forEach(s=>{if(!level.has(s.id)){maxLevel++;level.set(s.id,maxLevel);}});
+ const buckets=new Map();
+ states.forEach(s=>{const l=level.get(s.id);if(!buckets.has(l))buckets.set(l,[]);buckets.get(l).push(s);});
+ const xGap=116,yGap=86,left=68,top=66,radius=19;
+ const maxRows=Math.max(1,...[...buckets.values()].map(a=>a.length));
+ const width=Math.max(580,left*2+(maxLevel+1)*xGap);
+ const height=Math.max(190,top+maxRows*yGap+35);
+ const positions={};
+ buckets.forEach((items,l)=>{
+  items.forEach((state,i)=>{
+   positions[state.id]={x:left+l*xGap,y:top+(i-(items.length-1)/2)*yGap+maxRows*yGap/2};
   });
-  states.forEach(state=>{
-    const p=pos[state],g=document.createElementNS(ns,"g"),circle=document.createElementNS(ns,"circle"),txt=nodeSvg("text",state);
-    circle.setAttribute("cx",p.x);circle.setAttribute("cy",p.y);circle.setAttribute("r",radius);
-    circle.setAttribute("fill",state===a.inicial?"#dff3e7":(finals.has(state)?"#e1f5e8":"#eaf2fb"));circle.setAttribute("stroke",finals.has(state)?"#218653":color);circle.setAttribute("stroke-width","2.7");
-    if(finals.has(state)){const inner=document.createElementNS(ns,"circle");inner.setAttribute("cx",p.x);inner.setAttribute("cy",p.y);inner.setAttribute("r",radius-5);inner.setAttribute("fill","none");inner.setAttribute("stroke","#218653");inner.setAttribute("stroke-width","1.8");g.appendChild(inner);}
-    txt.setAttribute("x",p.x);txt.setAttribute("y",p.y+5);txt.setAttribute("text-anchor","middle");txt.setAttribute("class","nombre-estado");
-    g.appendChild(circle);g.appendChild(txt);svg.appendChild(g);
-  });
-  const sp=pos[a.inicial];if(sp){const start=document.createElementNS(ns,"path");start.setAttribute("d",`M${sp.x-62},${sp.y} L${sp.x-29},${sp.y}`);start.setAttribute("stroke","#344054");start.setAttribute("stroke-width","2");start.setAttribute("marker-end",`url(#${id})`);svg.appendChild(start);}
-  return svg;
+ });
+ const root=svg("svg",{viewBox:`0 0 ${width} ${height}`,width:"100%",height:height,role:"img","aria-label":`Diagrama ${type} estilo JFLAP`});
+ const defs=svg("defs"),marker=svg("marker",{id:`jflap-arrow-${type}`,markerWidth:8,markerHeight:8,refX:7,refY:3,orient:"auto",markerUnits:"strokeWidth"});
+ marker.appendChild(svg("path",{d:"M0,0 L0,6 L8,3 z",fill:"#315f86"}));defs.appendChild(marker);root.appendChild(defs);
+ const grouped=groupTransitions(transitions);
+ grouped.forEach((edge,index)=>{
+  const a=positions[edge.from],b=positions[edge.to];if(!a||!b)return;
+  let path,labelX,labelY;
+  if(edge.from===edge.to){
+   path=`M ${a.x-12} ${a.y-radius+1} C ${a.x-54} ${a.y-76}, ${a.x+54} ${a.y-76}, ${a.x+12} ${a.y-radius+1}`;
+   labelX=a.x;labelY=a.y-54;
+  }else{
+   const dx=b.x-a.x,dy=b.y-a.y;
+   const sx=a.x+(dx===0?0:Math.sign(dx)*radius),sy=a.y+(dx===0?Math.sign(dy)*radius:0);
+   const ex=b.x-(dx===0?0:Math.sign(dx)*(radius+4)),ey=b.y-(dx===0?Math.sign(dy)*(radius+4):0);
+   if(Math.abs(dy)<8){
+    path=`M ${sx} ${sy} L ${ex} ${ey}`;
+    labelX=(sx+ex)/2;labelY=(sy+ey)/2-10;
+   }else{
+    const bend=Math.max(22,Math.abs(dy)*.35);
+    const midX=(sx+ex)/2;
+    path=`M ${sx} ${sy} Q ${midX} ${sy+(dy>0?bend:-bend)} ${ex} ${ey}`;
+    labelX=midX;labelY=(sy+ey)/2+(dy>0?bend:-bend)-4;
+   }
+  }
+  root.appendChild(svg("path",{d:path,fill:"none",stroke:"#315f86","stroke-width":1.55,"marker-end":`url(#jflap-arrow-${type})`}));
+  const label=edge.symbols.map(s=>s==="ε"?"ε":s===" "?"␠":s).join(", ");
+  const txt=svg("text",{x:labelX,y:labelY,"text-anchor":"middle",fill:"#244d70","font-size":9,"font-family":"Arial, sans-serif"});
+  txt.textContent=label.length>24?label.slice(0,21)+"…":label;root.appendChild(txt);
+ });
+ states.forEach(state=>{
+  const p=positions[state.id];if(!p)return;
+  if(state.id===start){
+   root.appendChild(svg("path",{d:`M ${p.x-49} ${p.y} L ${p.x-radius-4} ${p.y}`,fill:"none",stroke:"#315f86","stroke-width":1.6,"marker-end":`url(#jflap-arrow-${type})`}));
+   const init=svg("text",{x:p.x-48,y:p.y-12,"text-anchor":"middle",fill:"#315f86","font-size":8});init.textContent="inicio";root.appendChild(init);
+  }
+  root.appendChild(svg("circle",{cx:p.x,cy:p.y,r:radius,fill:state.accepting?"#e5f8ef":"#edf4fb",stroke:state.accepting?"#0b9b63":"#315f86","stroke-width":1.7}));
+  if(state.accepting)root.appendChild(svg("circle",{cx:p.x,cy:p.y,r:radius-4,fill:"none",stroke:"#0b9b63","stroke-width":1.3}));
+  const label=svg("text",{x:p.x,y:p.y+3.5,"text-anchor":"middle",fill:"#173c5c","font-size":9,"font-family":"Arial, sans-serif"});label.textContent=state.id;root.appendChild(label);
+ });
+ return root;
 }
-function nodeSvg(tag,text){const e=document.createElementNS("http://www.w3.org/2000/svg",tag);e.textContent=text;return e;}
-function diagramPanel(a,type){
-  const card=node("section",undefined,`panel-diagrama ${type.toLowerCase()}`);
-  card.appendChild(node("h4",`${type} — ${type==="AFND"?"Autómata Finito No Determinista":"Autómata Finito Determinista"}`));
-  card.appendChild(node("p",`Expresión regular: ${a.expresion_regular||""}`));
-  const frame=node("div",undefined,"marco-diagrama");frame.appendChild(makeDiagram(a,type));card.appendChild(frame);
-  const legend=node("div",undefined,"leyenda");legend.textContent="● Estado inicial     ○ Estado intermedio     ◎ Estado de aceptación     → Transición etiquetada. D = dígito; L = letra; ε = cadena vacía.";card.appendChild(legend);
-  card.appendChild(node("p",`Estados: ${a.estados.length} · Estado inicial: ${a.inicial} · Estados finales: ${(a.finales||[]).join(", ")}`,"resumen-automata"));
-  return card;
+function makeTable(headers,rows){const table=document.createElement("table");const thead=document.createElement("thead"),tr=document.createElement("tr");headers.forEach(h=>{const th=document.createElement("th");th.textContent=h;tr.appendChild(th);});thead.appendChild(tr);table.appendChild(thead);const tbody=document.createElement("tbody");rows.forEach(r=>tbody.appendChild(cellRow(r)));table.appendChild(tbody);return table;}
+function panel(title,child){const box=document.createElement("div");box.className="automaton-panel";const h=document.createElement("h4");h.textContent=title;box.append(h,child);return box;}
+function renderAutomata(r){
+ automatas=r.automatas||[];const select=$("selectorAutomata");select.innerHTML="";
+ automatas.forEach(a=>{const o=document.createElement("option");o.value=a.campo;o.textContent=a.campo;select.appendChild(o);});
+ select.value=automatas.some(a=>a.campo==="DNI")?"DNI":automatas[0]?.campo||"";campoSeleccionado=select.value;renderSelectedAuto();
 }
-function mostrarAutomatas(items){
-  const box=$("contenedorAutomatas");box.replaceChildren();
-  if(!items.length){box.textContent="No se generaron autómatas.";return;}
-  items.forEach((item,i)=>{
-    const card=node("section",undefined,"automata-card");
-    card.appendChild(node("h3",`${i+1}. Autómata para ${item.tipo}`));
-    card.appendChild(node("p",`Expresión regular: ${item.expresion_regular}`));
-    const duo=node("div",undefined,"quintuplas-grid");
-    const q1=node("section",undefined,"subpanel");q1.appendChild(node("h4","Quíntupla del AFND"));q1.appendChild(quintupla(item.afnd));q1.appendChild(node("h4","Transiciones del AFND"));q1.appendChild(tableTransitions(item.afnd.transiciones));
-    const q2=node("section",undefined,"subpanel");q2.appendChild(node("h4","Quíntupla del AFD"));q2.appendChild(quintupla(item.afd));q2.appendChild(node("h4","Transiciones del AFD"));q2.appendChild(tableTransitions(item.afd.transiciones));
-    duo.append(q1,q2);card.appendChild(duo);
-    const graphs=node("div",undefined,"comparacion-automatas");
-    graphs.appendChild(diagramPanel({...item.afnd,expresion_regular:item.expresion_regular},"AFND"));
-    graphs.appendChild(diagramPanel({...item.afd,expresion_regular:item.expresion_regular},"AFD"));
-    card.appendChild(node("h4","Diagramas de los autómatas"));card.appendChild(graphs);box.appendChild(card);
-  });
+function renderQuintuple(q){
+ const rows=[["Q (estados)",`{ ${q.Q.join(", ")} }`],["Σ (alfabeto)",`{ ${q.Sigma.map(x=>x===" "?"␠":x).join(", ")} }`],["δ (transiciones)",`${q.delta.length} transiciones definidas en la tabla completa`],["q₀ (inicial)",q.q0],["F (finales)",`{ ${q.F.join(", ")} }`]];
+ return makeTable(["Componente","Valor"],rows);
 }
+function renderSelectedAuto(){
+ const host=$("detalleAutomata");host.innerHTML="";const a=automatas.find(x=>x.campo===campoSeleccionado);if(!a){host.textContent="No hay autómatas disponibles.";return;}
+ const er=document.createElement("div");er.className="regex-display";er.innerHTML=`<b>Expresión regular de ${esc(a.campo)}</b><code>${esc(a.regex)}</code>`;host.appendChild(er);
+ if(a.error){const p=document.createElement("p");p.textContent=a.error;host.appendChild(p);return;}
+ const pair=document.createElement("div");pair.className="automata-pair";
+ const nfaGraph=graphFor(a.afnd,"AFND"),dfaGraph=graphFor(a.afd,"AFD");
+ pair.appendChild(panel("Autómata Finito No Determinista (AFND)",nfaGraph));pair.appendChild(panel("Autómata Finito Determinista (AFD)",dfaGraph));host.appendChild(pair);
+ const nfaRows=(a.afnd.states||[]).flatMap(s=>(s.transitions||[]).map(t=>[s.id,t.symbol,t.to]));
+ host.appendChild(panel("Tabla de transiciones del AFND",makeTable(["Estado origen","Símbolo","Estado destino"],nfaRows)));
+ host.appendChild(panel("Quíntupla del AFND",renderQuintuple(a.afnd.quintuple)));
+ const dfaRows=(a.afd.transitions||[]).map(t=>[t.from,t.symbol,t.to]);
+ host.appendChild(panel("Tabla de transiciones del AFD",makeTable(["Estado origen","Símbolo","Estado destino"],dfaRows)));
+ host.appendChild(panel("Quíntupla del AFD",renderQuintuple(a.quintuple)));
+}
+$("selectorAutomata").addEventListener("change",e=>{campoSeleccionado=e.target.value;renderSelectedAuto();$("resultadoSimulacion").textContent="Escribe una cadena para simular.";});
+function simulateDFA(){
+ const a=automatas.find(x=>x.campo===campoSeleccionado);if(!a||a.error)return;
+ const input=$("cadenaSimular").value;let state=a.afd.start,trace=[state],failed=false;
+ for(const ch of input){const tr=a.afd.transitions.find(t=>t.from===state&&t.symbol===ch);if(!tr){failed=true;break;}state=tr.to;trace.push(state);}
+ const accepted=!failed&&a.afd.final.includes(state);
+ $("resultadoSimulacion").textContent=`${accepted?"CADENA ACEPTADA":"CADENA RECHAZADA"} · Recorrido: ${trace.join(" → ")}${failed?" → transición inexistente":""}`;
+ $("resultadoSimulacion").className="simulation-result "+(accepted?"good":"bad");
+}
+$("btnSimular").addEventListener("click",simulateDFA);$("cadenaSimular").addEventListener("keydown",e=>{if(e.key==="Enter")simulateDFA();});
+function renderErrors(r){
+ const p=$("erroresPanel"),list=$("listaErrores");list.innerHTML="";const errors=r.errores||[];p.classList.toggle("hidden",!errors.length);
+ errors.forEach(e=>{const li=document.createElement("li");li.textContent=e;list.appendChild(li);});
+}
+function renderResult(r){
+ ultimo=r;$("resultado").classList.remove("hidden");$("proceso").classList.remove("hidden");
+ $("estadoBadge").textContent=r.valido?"Registro médico válido: análisis léxico, sintáctico y semántico completados.":"Registro con errores: revisa las observaciones del compilador.";
+ $("estadoBadge").className="result-banner "+(r.valido?"good":"bad");
+ $("estadoDescripcion").textContent=r.valido?"La información se encuentra estructurada y lista para revisión o almacenamiento.":"La información contiene campos faltantes, valores inválidos o problemas de estructura.";
+ $("totalTokens").textContent=r.total_tokens;$("totalCampos").textContent=`${r.campos_reconocidos}/${r.total_campos}`;$("totalErrores").textContent=r.errores.length;
+ $("resultadoJSON").textContent=JSON.stringify(r.datos,null,2);$("jsonProceso").textContent=JSON.stringify(r.datos,null,2);
+ $("origenInfo").textContent=mode()==="plantilla"?"Plantilla web":mode()==="archivo"?"Archivo TXT":"DSL ingresado manualmente";
+ renderGroups(r);renderSequence(r);renderGrammar(r);renderSemantic(r);renderAutomata(r);renderErrors(r);
+}
+async function analyze(){
+ $("btnAnalizar").disabled=true;$("btnAnalizar").textContent="Analizando...";
+ try{const texto=await textoEntrada();if(!texto)throw Error("Ingresa un registro médico.");const res=await fetch("/analizar",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({texto})});const data=await res.json();if(!res.ok)throw Error(data.mensaje||"No se pudo analizar.");renderResult(data);notice("Análisis completado. Revisa las secciones B y C.","success");$("resultado").scrollIntoView({behavior:"smooth",block:"start"});}
+ catch(e){notice(e.message,"error");}
+ finally{$("btnAnalizar").disabled=false;$("btnAnalizar").textContent="Analizar y compilar registro";}
+}
+$("btnAnalizar").addEventListener("click",analyze);
+$("btnEjemplo").addEventListener("click",()=>{document.querySelector('input[name="modo"][value="dsl"]').checked=true;changeMode();$("codigoDSL").value=EJEMPLO;notice("Ejemplo de registro médico cargado.","success");});
+$("btnLimpiar").addEventListener("click",()=>{$("codigoDSL").value="";$("archivoTxt").value="";$("nombreArchivo").textContent="Ningún archivo seleccionado";CAMPOS.forEach(c=>{if($(c))$(c).value="";});$("resultado").classList.add("hidden");$("proceso").classList.add("hidden");ultimo=null;notice("Formulario limpiado.","success");});
+$("archivoTxt").addEventListener("change",e=>$("nombreArchivo").textContent=e.target.files[0]?.name||"Ningún archivo seleccionado");
+$("btnPDF").addEventListener("click",async()=>{if(!ultimo)return;try{const res=await fetch("/descargar-pdf",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({resultado:ultimo})});if(!res.ok)throw Error("No se pudo generar el PDF.");const blob=await res.blob(),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="reporte_rulecheck.pdf";a.click();URL.revokeObjectURL(url);}catch(e){notice(e.message,"error");}});
+$("btnJSON").addEventListener("click",()=>{if(!ultimo)return;const blob=new Blob([JSON.stringify(ultimo.datos,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="registro_medico.json";a.click();URL.revokeObjectURL(url);});
+changeMode();
